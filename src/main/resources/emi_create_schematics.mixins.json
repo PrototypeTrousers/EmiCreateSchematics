@@ -12,6 +12,7 @@
   },
   "mixins": [
     "EmiApiMixin",
+    "EmiFavoritesMixin",
     "TreeCostMixin"
   ]
 }
