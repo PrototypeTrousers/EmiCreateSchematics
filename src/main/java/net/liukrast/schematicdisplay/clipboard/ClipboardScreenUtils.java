@@ -14,6 +14,7 @@ import dev.emi.emi.bom.BoM;
 import dev.emi.emi.bom.MaterialNode;
 import dev.emi.emi.bom.MaterialTree;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -21,8 +22,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-import static net.liukrast.schematicdisplay.EMICreateSchematics.MOD_ID;
+import static net.liukrast.schematicdisplay.EMICreateSchematics.*;
 import static net.liukrast.schematicdisplay.SchematicPlugin.CLIPBOARD;
+import static net.minecraft.core.component.DataComponents.CUSTOM_NAME;
 
 public final class ClipboardScreenUtils {
     public static void load(List<List<ClipboardEntry>> pages) {
@@ -40,10 +42,9 @@ public final class ClipboardScreenUtils {
                 cr.getInputs().add(EmiStack.of(stack1));
             }
         }
-
-        cr.getOutputs().add(EmiStack.EMPTY);
+        ItemStack out = Minecraft.getInstance().player.getMainHandItem().copyWithCount(1);
+        cr.getOutputs().add(EmiStack.of(out));
         setGoal(cr);
-        //EmiApi.viewRecipeTree();
     }
 
 
@@ -62,7 +63,7 @@ public final class ClipboardScreenUtils {
         }
     }
 
-    static class ChildlessMaterialNode extends MaterialNode {
+    public static class ChildlessMaterialNode extends MaterialNode {
         public ChildlessMaterialNode(EmiIngredient ingredient) {
             super(ingredient);
             children = List.of();
@@ -125,7 +126,7 @@ public final class ClipboardScreenUtils {
         }
     }
 
-    static class ClipboardRecipe extends BasicEmiRecipe {
+    public static class ClipboardRecipe extends BasicEmiRecipe {
 
         public ClipboardRecipe(EmiRecipeCategory category, ResourceLocation id, int width, int height) {
             super(category, id, width, height);
