@@ -4,6 +4,7 @@ import com.simibubi.create.content.equipment.clipboard.ClipboardEntry;
 import com.simibubi.create.content.equipment.clipboard.ClipboardScreen;
 import com.simibubi.create.foundation.gui.AllIcons;
 import com.simibubi.create.foundation.gui.widget.IconButton;
+import dev.emi.emi.api.EmiStackProvider;
 import net.createmod.catnip.gui.AbstractSimiScreen;
 import net.liukrast.schematicdisplay.EMICreateSchematics;
 import net.liukrast.schematicdisplay.clipboard.ClipboardScreenUtils;
@@ -18,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
 
 @Mixin(ClipboardScreen.class)
-public abstract class ClipboardScreenMixin extends AbstractSimiScreen {
+public abstract class ClipboardScreenMixin extends AbstractSimiScreen implements EmiStackProvider<ClipboardScreen> {
     @Unique
     private static final Component emi_create_schematics$TOOLTIP = Component.translatable("gui." + EMICreateSchematics.MOD_ID + ".clipboard.favourite");
 

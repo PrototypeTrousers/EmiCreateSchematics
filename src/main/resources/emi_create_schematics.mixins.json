@@ -4,13 +4,14 @@
   "package": "net.liukrast.schematicdisplay.mixin",
   "compatibilityLevel": "JAVA_8",
   "refmap": "emi_create_schematics.refmap.json",
-  "mixins": [
-    "ItemEmiStackMixin"
-  ],
   "client": [
     "ClipboardScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "mixins": [
+    "EmiApiMixin",
+    "TreeCostMixin"
+  ]
 }

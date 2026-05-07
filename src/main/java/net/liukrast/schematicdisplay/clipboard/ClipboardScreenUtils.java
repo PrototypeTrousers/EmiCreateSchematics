@@ -1,50 +1,153 @@
 package net.liukrast.schematicdisplay.clipboard;
 
+import com.google.common.collect.Lists;
+import com.simibubi.create.AllBlocks;
 import com.simibubi.create.content.equipment.clipboard.ClipboardEntry;
+import dev.emi.emi.api.EmiApi;
+import dev.emi.emi.api.recipe.BasicEmiRecipe;
+import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.EmiRecipeCategory;
+import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
-import dev.emi.emi.runtime.EmiFavorite;
-import dev.emi.emi.runtime.EmiFavorites;
-import net.minecraft.core.component.DataComponents;
+import dev.emi.emi.api.widget.WidgetHolder;
+import dev.emi.emi.bom.BoM;
+import dev.emi.emi.bom.MaterialNode;
+import dev.emi.emi.bom.MaterialTree;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
+import static net.liukrast.schematicdisplay.EMICreateSchematics.MOD_ID;
+import static net.liukrast.schematicdisplay.SchematicPlugin.CLIPBOARD;
+
 public final class ClipboardScreenUtils {
-    public static final String REAL_COUNT_KEY = "CreateEMISchematicsData";
-    private ClipboardScreenUtils() {}
-
     public static void load(List<List<ClipboardEntry>> pages) {
-        List<ClipboardEntry> allEntries = new ArrayList<>();
-        for(var page : pages)
-            allEntries.addAll(page);
-        allEntries.sort(Comparator.comparingInt((ClipboardEntry entry) -> entry.itemAmount).reversed());
+        Minecraft.getInstance().setScreen(null);
 
-        var copiedList = new ArrayList<>(EmiFavorites.favorites);
+        ClipboardRecipe cr = new ClipboardRecipe(CLIPBOARD, ResourceLocation.fromNamespaceAndPath(MOD_ID, "/schematic/clipboard"), 0, 0);
 
-        copiedList.stream()
-                .filter(fav -> {
-                    if(!(fav.getStack() instanceof EmiStack stack)) return false;
-                    var data = stack.getItemStack().getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        for (var page : pages) {
+            for (var entry : page) {
+                if (entry.icon.isEmpty()) {
+                    continue;
+                }
+                ItemStack stack1 = entry.icon.copy();
+                stack1.setCount(entry.itemAmount);
+                cr.getInputs().add(EmiStack.of(stack1));
+            }
+        }
 
-                    if(data.isEmpty()) return false;
-                    return data.contains(REAL_COUNT_KEY);
-                })
-                .forEach(EmiFavorites::removeFavorite);
-
-        for(var entry : allEntries) {
-            ItemStack stack1 = entry.icon.copy();
-            stack1.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, existingData ->
-                    existingData.update(tag -> tag.putLong(REAL_COUNT_KEY, entry.itemAmount))
-            );
-            EmiStack emiStack = EmiStack.of(stack1);
-            emiStack.setAmount(1);
+        cr.getOutputs().add(EmiStack.EMPTY);
+        setGoal(cr);
+        //EmiApi.viewRecipeTree();
+    }
 
 
+    private static void setGoal(EmiRecipe recipe) {
+        BoM.tree = new ChildlessMaterialTree(recipe);
+        BoM.craftingMode = true;
+    }
 
-            if(!entry.checked) EmiFavorites.addFavorite(emiStack);
+    public static class ChildlessMaterialTree extends MaterialTree {
+        public ChildlessMaterialTree(EmiRecipe recipe) {
+            super(recipe);
+            EmiStack output = recipe.getOutputs().get(0);
+            goal = new ParentOnlyMaterialNode(output);
+            goal.defineRecipe(recipe);
+            goal.recalculate(this);
+        }
+    }
+
+    static class ChildlessMaterialNode extends MaterialNode {
+        public ChildlessMaterialNode(EmiIngredient ingredient) {
+            super(ingredient);
+            children = List.of();
+        }
+
+        @Override
+        public void defineRecipe(EmiRecipe recipe) {
+        }
+    }
+
+    public static class ParentOnlyMaterialNode extends MaterialNode {
+        public ParentOnlyMaterialNode(EmiIngredient ingredient) {
+            super(ingredient);
+        }
+
+        @Override
+        public void defineRecipe(EmiRecipe recipe) {
+            produceChance = 1;
+            if (recipe == null) {
+                return;
+            }
+            this.recipe = recipe;
+            divisor = 0;
+            for (EmiStack stack : recipe.getOutputs()) {
+                if (stack.equals(ingredient)) {
+                    if (divisor > 0) {
+                        if (produceChance != 1 || stack.getChance() != 1) {
+                            produceChance = (stack.getAmount() * stack.getChance() + divisor * produceChance) / (divisor + stack.getAmount());
+                        }
+                        divisor += stack.getAmount();
+                    } else {
+                        divisor = stack.getAmount();
+                        produceChance = stack.getChance();
+                    }
+                }
+            }
+            if (divisor <= 0) {
+                divisor = 1;
+            }
+            this.children = Lists.newArrayList();
+            outer:
+            for (EmiIngredient i : recipe.getInputs()) {
+                EmiStack remainder = EmiStack.EMPTY;
+                if (i.getEmiStacks().size() == 1) {
+                    remainder = i.getEmiStacks().get(0).getRemainder();
+                }
+                for (MaterialNode node : children) {
+                    if (EmiIngredient.areEqual(i, node.ingredient) && EmiIngredient.areEqual(remainder, node.remainder)) {
+                        node.amount += i.getAmount();
+                        node.remainderAmount += remainder.getAmount();
+                        continue outer;
+                    }
+                }
+                if (!i.isEmpty()) {
+                    MaterialNode node = new ChildlessMaterialNode(i);
+                    node.consumeChance = i.getChance();
+                    children.add(node);
+                }
+            }
+        }
+    }
+
+    static class ClipboardRecipe extends BasicEmiRecipe {
+
+        public ClipboardRecipe(EmiRecipeCategory category, ResourceLocation id, int width, int height) {
+            super(category, id, width, height);
+        }
+
+        @Override
+        public void addWidgets(WidgetHolder widgets) {
+        }
+
+        @Override
+        public boolean supportsRecipeTree() {
+            return true;
+        }
+
+        @Override
+        public boolean hideCraftable() {
+            return super.hideCraftable();
+        }
+
+        @Override
+        public @Nullable RecipeHolder<?> getBackingRecipe() {
+            return null;
         }
     }
 }

@@ -32,7 +32,7 @@ side = "CLIENT"
 modId = "create"
 type = "required"
 versionRange = "${create_version_range}"
-ordering = "NONE"
+ordering = "AFTER"
 side = "CLIENT"
 
 [[dependencies."${mod_id}"]]
