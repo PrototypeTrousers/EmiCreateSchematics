@@ -1,21 +1,20 @@
 package net.liukrast.schematicdisplay;
 
-import com.mojang.serialization.Codec;
 import com.simibubi.create.AllBlocks;
-import com.simibubi.create.content.equipment.clipboard.ClipboardBlockItem;
-import io.netty.buffer.ByteBuf;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
+import net.liukrast.schematicdisplay.network.ExtractItemPayload;
+import net.liukrast.schematicdisplay.network.NetworkEventHandler;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.attachment.AttachmentType;
-import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,5 +38,7 @@ public class EMICreateSchematics {
     public EMICreateSchematics(IEventBus modBus) {
         ITEMS.register(modBus);
     }
+
+
 
 }
