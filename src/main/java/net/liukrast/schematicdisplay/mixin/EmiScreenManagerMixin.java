@@ -1,27 +1,32 @@
 package net.liukrast.schematicdisplay.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.platform.InputConstants;
-import com.simibubi.create.AllBlocks;
-import com.simibubi.create.AllDataComponents;
-import com.simibubi.create.content.equipment.clipboard.ClipboardContent;
-import com.simibubi.create.content.equipment.clipboard.ClipboardOverrides;
+import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiPlayerInventory;
+import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.handler.EmiRecipeHandler;
+import dev.emi.emi.api.recipe.handler.StandardRecipeHandler;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.stack.EmiStackInteraction;
 import dev.emi.emi.bom.BoM;
 import dev.emi.emi.input.EmiBind;
 import dev.emi.emi.input.EmiInput;
+import dev.emi.emi.registry.EmiRecipeFiller;
 import dev.emi.emi.runtime.EmiFavorite;
 import dev.emi.emi.runtime.EmiFavorites;
 import dev.emi.emi.screen.EmiScreenManager;
 import net.liukrast.schematicdisplay.clipboard.ClipboardScreenUtils;
 import net.liukrast.schematicdisplay.network.ExtractItemPayload;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 import org.objectweb.asm.Opcodes;
@@ -29,9 +34,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
@@ -156,4 +163,46 @@ public class EmiScreenManagerMixin {
             }
         }
     }
+
+    @WrapOperation(method = "renderSlotOverlays", at = @At(value = "INVOKE", target = "Ldev/emi/emi/api/recipe/handler/StandardRecipeHandler;getInputSources(Lnet/minecraft/world/inventory/AbstractContainerMenu;)Ljava/util/List;"))
+    private static List<Slot> b(StandardRecipeHandler instance, AbstractContainerMenu menu, Operation<List<Slot>> original) {
+        return Collections.EMPTY_LIST;
+    }
+
+    @Inject(method = "updateCraftables", at = @At(value = "INVOKE", target = "Ldev/emi/emi/screen/EmiScreenManager;getSearchPanel()Ldev/emi/emi/screen/EmiScreenManager$SidebarPanel;"))
+    private static void updateCraftables(CallbackInfo ci, @Local EmiPlayerInventory inv) {
+        if (BoM.tree != null && BoM.craftingMode) {
+            AbstractContainerScreen<?> screen = EmiApi.getHandledScreen();
+            if (screen != null) {
+                List<EmiRecipeHandler<?>> handlers = (List) EmiRecipeFiller.getAllHandlers(screen);
+                if (!handlers.isEmpty()) {
+                    if (handlers.get(0) instanceof StandardRecipeHandler standard) {
+                        List<Slot> slots = standard.getInputSources(screen.getMenu());
+                        for (EmiFavorite.Synthetic syntheticFavorite : EmiFavorites.syntheticFavorites) {
+                            for (Slot slot : slots) {
+                                if (slot.container == Minecraft.getInstance().player.getInventory()) {
+                                    continue;
+                                }
+                                EmiStack synth = syntheticFavorite.getStack().getEmiStacks().get(0);
+                                EmiStack onSlot = EmiStack.of(slot.getItem());
+
+                                if (synth.isEqual(onSlot)) {
+                                    inv.inventory.compute(synth, (k, v) -> {
+                                                v.setAmount(v.getAmount() - onSlot.getAmount());
+                                                if (v.getAmount() <= 0) {
+                                                    v = null;
+                                                }
+                                                return v;
+                                            }
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+//            ignoredSlots.addAll(standard.getInputSources(hs.getMenu()));
+
 }
