@@ -1,6 +1,10 @@
 package net.liukrast.schematicdisplay.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.simibubi.create.AllBlocks;
+import com.simibubi.create.AllDataComponents;
+import com.simibubi.create.content.equipment.clipboard.ClipboardContent;
+import com.simibubi.create.content.equipment.clipboard.ClipboardOverrides;
 import dev.emi.emi.api.recipe.EmiPlayerInventory;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeManager;
@@ -33,6 +37,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.Function;
 
@@ -110,16 +115,19 @@ public class EmiScreenManagerMixin {
                     }
                 }
                 if (!existing) {
-                    inputs.add(stack.getStack());
+                    inputs.add(stack.getStack().copy().setAmount(1));
                 }
                 BoM.craftingMode = true;
                 glt.recalculate();
                 EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
             } else {
                 ClipboardScreenUtils.ClipboardRecipe cr = new ClipboardScreenUtils.ClipboardRecipe(CLIPBOARD, ResourceLocation.fromNamespaceAndPath(MOD_ID, "/schematic/clipboard"), 0, 0);
-                ItemStack out = Minecraft.getInstance().player.getMainHandItem().copyWithCount(1);
+
+                ItemStack out = new ItemStack(AllBlocks.CLIPBOARD);
+                ClipboardContent content = out.getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY);
+                out.set(AllDataComponents.CLIPBOARD_CONTENT, content.setType(ClipboardOverrides.ClipboardType.EDITING));
                 cr.getOutputs().add(EmiStack.of(out));
-                cr.getInputs().add(stack.getStack().getEmiStacks().get(0));
+                cr.getInputs().add(stack.getStack().copy().setAmount(1));
 
                 BoM.tree = new ClipboardScreenUtils.GoallessMaterialTree(cr);
                 BoM.craftingMode = true;
@@ -130,18 +138,27 @@ public class EmiScreenManagerMixin {
             if (BoM.tree instanceof ClipboardScreenUtils.GoallessMaterialTree glt) {
                 List<EmiIngredient> inputs = glt.goal.recipe.getInputs();
                 out:
-                for (EmiIngredient ingredient : inputs) {
+                for (Iterator<EmiIngredient> iterator = inputs.iterator(); iterator.hasNext(); ) {
+                    EmiIngredient ingredient = iterator.next();
                     for (EmiStack es : ingredient.getEmiStacks()) {
                         if (es.isEqual(stack.getStack().getEmiStacks().get(0))) {
                             ingredient.setAmount(ingredient.getAmount() - 1);
+                            if (ingredient.getAmount() <= 0) {
+                                iterator.remove();
+                            }
                             break out;
                         }
                     }
                 }
 
-                BoM.craftingMode = true;
-                glt.recalculate();
-                EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
+                if (inputs.isEmpty()) {
+                    BoM.tree = null;
+                    BoM.craftingMode = false;
+                } else {
+                    BoM.craftingMode = true;
+                    glt.recalculate();
+                    EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
+                }
             }
         }
     }

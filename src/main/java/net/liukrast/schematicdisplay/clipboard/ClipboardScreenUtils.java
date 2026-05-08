@@ -1,6 +1,11 @@
 package net.liukrast.schematicdisplay.clipboard;
 
+import com.simibubi.create.AllBlocks;
+import com.simibubi.create.AllDataComponents;
+import com.simibubi.create.content.equipment.clipboard.ClipboardBlock;
+import com.simibubi.create.content.equipment.clipboard.ClipboardContent;
 import com.simibubi.create.content.equipment.clipboard.ClipboardEntry;
+import com.simibubi.create.content.equipment.clipboard.ClipboardOverrides;
 import dev.emi.emi.api.recipe.BasicEmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeCategory;
@@ -37,7 +42,9 @@ public final class ClipboardScreenUtils {
                 cr.getInputs().add(EmiStack.of(stack1));
             }
         }
-        ItemStack out = Minecraft.getInstance().player.getMainHandItem().copyWithCount(1);
+        ItemStack out = new ItemStack(AllBlocks.CLIPBOARD);
+        ClipboardContent content = out.getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY);
+        out.set(AllDataComponents.CLIPBOARD_CONTENT, content.setType(ClipboardOverrides.ClipboardType.EDITING));
         cr.getOutputs().add(EmiStack.of(out));
         setGoal(cr);
     }
