@@ -19,7 +19,7 @@ public abstract class TreeCostMixin {
 
     @Inject(method = "calculateCost", at = @At(value = "TAIL"))
     private void completeParent(MaterialNode node, long amount, ChanceState chance, boolean trackProgress, CallbackInfo ci) {
-        if (node instanceof ClipboardScreenUtils.ParentOnlyMaterialNode) {
+        if (node instanceof ClipboardScreenUtils.DummyMaterialNode) {
             if (node.children != null && !node.children.isEmpty()) {
                 if (node.children.stream().allMatch(p -> p.progress == ProgressState.COMPLETED)) {
                     complete(node);
@@ -31,7 +31,7 @@ public abstract class TreeCostMixin {
 
     @WrapOperation(method = "calculateCost", at = @At(value = "INVOKE", target = "Ldev/emi/emi/bom/TreeCost;getRemainder(Ldev/emi/emi/api/stack/EmiStack;JZ)J"))
     private long calculateCost2(TreeCost instance, EmiStack stack, long desired, boolean catalyst, Operation<Long> original, MaterialNode node) {
-        if (node instanceof ClipboardScreenUtils.ParentOnlyMaterialNode) {
+        if (node instanceof ClipboardScreenUtils.DummyMaterialNode) {
             return 0;
         }
         return original.call(instance, stack, desired, catalyst);

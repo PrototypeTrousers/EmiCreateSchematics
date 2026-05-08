@@ -1,16 +1,30 @@
 package net.liukrast.schematicdisplay.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.emi.emi.api.recipe.EmiPlayerInventory;
+import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.EmiRecipeManager;
+import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.stack.EmiStackInteraction;
+import dev.emi.emi.bom.BoM;
 import dev.emi.emi.input.EmiBind;
 import dev.emi.emi.input.EmiInput;
+import dev.emi.emi.registry.EmiRecipes;
+import dev.emi.emi.runtime.EmiFavorite;
+import dev.emi.emi.runtime.EmiFavorites;
 import dev.emi.emi.screen.EmiScreenManager;
+import it.unimi.dsi.fastutil.chars.AbstractChar2ObjectMap;
+import net.liukrast.schematicdisplay.clipboard.ClipboardScreenUtils;
 import net.liukrast.schematicdisplay.network.ExtractItemPayload;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.lwjgl.glfw.GLFW;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -18,7 +32,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.List;
 import java.util.function.Function;
+
+import static net.liukrast.schematicdisplay.EMICreateSchematics.MOD_ID;
+import static net.liukrast.schematicdisplay.SchematicPlugin.CLIPBOARD;
 
 @Mixin(EmiScreenManager.class)
 public class EmiScreenManagerMixin {
@@ -26,22 +44,97 @@ public class EmiScreenManagerMixin {
     private static final EmiBind grabStackToInventory = new EmiBind("key.emi.cheat_stack_to_inventory",
             new EmiBind.ModifiedKey(InputConstants.Type.MOUSE.getOrCreate(0), EmiInput.SHIFT_MASK));
 
+    @Unique
+    private static final EmiBind addStackToCraftingTree = new EmiBind("key.emi.cheat_stack_to_inventory",
+            new EmiBind.ModifiedKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_KP_ADD), 0));
+
+    @Unique
+    private static final EmiBind removeStackFromCraftingTree = new EmiBind("key.emi.cheat_stack_to_inventory",
+            new EmiBind.ModifiedKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_KP_SUBTRACT), 0));
+
     @Inject(method = "stackInteraction", at = @At(value = "FIELD", target = "Ldev/emi/emi/config/EmiConfig;cheatMode:Z", opcode = Opcodes.GETSTATIC))
     private static void a(EmiStackInteraction stack, Function<EmiBind, Boolean> function, CallbackInfoReturnable<Boolean> cir) {
         if (function.apply(grabStackToInventory)) {
-            for (Slot slot : Minecraft.getInstance().player.containerMenu.slots) {
-                if (slot.container == Minecraft.getInstance().player.getInventory()) {
+            Player player = Minecraft.getInstance().player;
+            long amount;
+            if (stack.getStack() instanceof EmiFavorite.Synthetic synthetic) {
+                amount = synthetic.amount;
+            } else {
+                amount = stack.getStack().getAmount();
+            }
+            out:
+            for (Slot slot : player.containerMenu.slots) {
+                if (slot.container == player.getInventory()) {
                     continue;
+                }
+                if (!slot.mayPickup(player)) {
+                    continue;
+                }
+                if (!player.containerMenu.canTakeItemForPickAll(slot.getItem(), slot)) {
+                    return;
                 }
                 for (EmiStack es : stack.getStack().getEmiStacks()) {
                     if (es.isEqual(EmiStack.of(slot.getItem()))) {
                         PacketDistributor.sendToServer(new ExtractItemPayload(
-                                Minecraft.getInstance().player.containerMenu.containerId,
+                                player.containerMenu.containerId,
                                 slot.index,
-                                (int) stack.getStack().getAmount()
+                                (int) amount
                         ));
+                        amount -= slot.getItem().getCount();
+                    }
+                    if (amount <= 0) {
+                        break out;
                     }
                 }
+            }
+        }
+        if (function.apply(addStackToCraftingTree)) {
+            if (BoM.tree instanceof ClipboardScreenUtils.GoallessMaterialTree glt) {
+                List<EmiIngredient> inputs = glt.goal.recipe.getInputs();
+                boolean existing = false;
+                out:
+                for (EmiIngredient ingredient : inputs) {
+                    for (EmiStack es : ingredient.getEmiStacks()) {
+                        if (es.isEqual(stack.getStack().getEmiStacks().get(0))) {
+                            ingredient.setAmount(ingredient.getAmount() + 1);
+                            existing = true;
+                            break out;
+                        }
+                    }
+                }
+                if (!existing) {
+                    inputs.add(stack.getStack());
+                }
+                BoM.craftingMode = true;
+                glt.recalculate();
+                EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
+            } else {
+                ClipboardScreenUtils.ClipboardRecipe cr = new ClipboardScreenUtils.ClipboardRecipe(CLIPBOARD, ResourceLocation.fromNamespaceAndPath(MOD_ID, "/schematic/clipboard"), 0, 0);
+                ItemStack out = Minecraft.getInstance().player.getMainHandItem().copyWithCount(1);
+                cr.getOutputs().add(EmiStack.of(out));
+                cr.getInputs().add(stack.getStack().getEmiStacks().get(0));
+
+                BoM.tree = new ClipboardScreenUtils.GoallessMaterialTree(cr);
+                BoM.craftingMode = true;
+                EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
+            }
+        }
+        if (function.apply(removeStackFromCraftingTree)) {
+            if (BoM.tree instanceof ClipboardScreenUtils.GoallessMaterialTree glt) {
+                List<EmiIngredient> inputs = glt.goal.recipe.getInputs();
+                out:
+                for (EmiIngredient ingredient : inputs) {
+                    for (EmiStack es : ingredient.getEmiStacks()) {
+                        if (es.isEqual(stack.getStack().getEmiStacks().get(0))) {
+                            ingredient.setAmount(ingredient.getAmount() - 1);
+                            break out;
+                        }
+                    }
+                }
+
+                BoM.craftingMode = true;
+                glt.recalculate();
+                EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
             }
         }
     }
