@@ -32,24 +32,32 @@ public class NetworkEventHandler {
 
                         // Validate the player is looking at the correct menu to prevent cheating
                         if (menu.containerId != payload.containerId()) return;
-                        Slot slot = menu.getSlot(payload.slotIndex());
-                        if (slot != null && slot.hasItem()) {
-                            // Extract the requested amount
-                            if (!menu.canTakeItemForPickAll(slot.getItem(),slot)) {
-                                return;
-                            }
-                            if (!slot.mayPickup(player)) {
-                                return;
-                            }
-                            Optional<ItemStack> simextracted = slot.tryRemove(payload.amount(), Integer.MAX_VALUE, player);
-                            if (simextracted.isPresent()) {
-                                ItemStack extracted = simextracted.get();
-                                if (!player.getInventory().add(extracted)) {
-                                    // If their inventory is full, drop the remaining items on the ground
-                                    player.drop(extracted, false);
+                        int remaining = payload.amount();
+                        for (int slotIndex : payload.slotIndices()) {
+                            if (slotIndex < 0 || slotIndex >= menu.slots.size()) return;
+                            Slot slot = menu.getSlot(slotIndex);
+                            if (slot.hasItem()) {
+                                // Extract the requested amount
+                                if (!menu.canTakeItemForPickAll(slot.getItem(), slot)) {
+                                    continue; // Skip this slot instead of aborting the whole packet
+                                }
+                                if (!slot.mayPickup(player)) {
+                                    continue; // Skip this slot
+                                }
+
+                                Optional<ItemStack> simextracted = slot.tryRemove(remaining, Integer.MAX_VALUE, player);
+                                if (simextracted.isPresent()) {
+                                    ItemStack extracted = simextracted.get();
+                                    remaining -= extracted.getCount();
+                                    if (!player.getInventory().add(extracted)) {
+                                        // If their inventory is full, drop the remaining items on the ground
+                                        player.drop(extracted, false);
+                                    }
                                 }
                             }
-
+                            if (remaining == 0) {
+                                return;
+                            }
                         }
                     });
                 }

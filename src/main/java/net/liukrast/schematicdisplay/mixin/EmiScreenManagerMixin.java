@@ -32,6 +32,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -62,6 +63,8 @@ public class EmiScreenManagerMixin {
             } else {
                 amount = stack.getStack().getAmount();
             }
+
+            List<Integer> slots = new ArrayList<>();
             out:
             for (Slot slot : player.containerMenu.slots) {
                 if (slot.container == player.getInventory()) {
@@ -73,19 +76,23 @@ public class EmiScreenManagerMixin {
                 if (!player.containerMenu.canTakeItemForPickAll(slot.getItem(), slot)) {
                     return;
                 }
+                long remaining = amount;
                 for (EmiStack es : stack.getStack().getEmiStacks()) {
                     if (es.isEqual(EmiStack.of(slot.getItem()))) {
-                        PacketDistributor.sendToServer(new ExtractItemPayload(
-                                player.containerMenu.containerId,
-                                slot.index,
-                                (int) amount
-                        ));
-                        amount -= slot.getItem().getCount();
+                        slots.add(slot.getSlotIndex());
+                        remaining -= slot.getItem().getCount();
                     }
-                    if (amount <= 0) {
+                    if (remaining <= 0) {
                         break out;
                     }
                 }
+            }
+            if (!slots.isEmpty()) {
+                PacketDistributor.sendToServer(new ExtractItemPayload(
+                        player.containerMenu.containerId,
+                        slots,
+                        (int) amount
+                ));
             }
         }
         if (function.apply(addStackToCraftingTree)) {
