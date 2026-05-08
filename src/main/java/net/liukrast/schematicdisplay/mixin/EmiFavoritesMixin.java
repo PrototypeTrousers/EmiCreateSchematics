@@ -24,9 +24,6 @@ import java.util.Map;
 
 @Mixin(EmiFavorites.class)
 public abstract class EmiFavoritesMixin {
-    @Shadow
-    public static List<EmiFavorite.Synthetic> syntheticFavorites;
-
     @WrapOperation(method = "updateSynthetic", at = @At(value = "INVOKE", target = "Ljava/util/List;add(Ljava/lang/Object;)Z"))
     private static boolean a(List<EmiFavorite.Synthetic> instance, Object o, Operation<Boolean> original) {
         if (o instanceof EmiFavorite.Synthetic synthetic) {

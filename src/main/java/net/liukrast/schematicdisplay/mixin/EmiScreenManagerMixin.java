@@ -5,14 +5,17 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.emi.emi.api.EmiApi;
+import dev.emi.emi.api.recipe.EmiCraftingRecipe;
 import dev.emi.emi.api.recipe.EmiPlayerInventory;
 import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.EmiResolutionRecipe;
 import dev.emi.emi.api.recipe.handler.EmiRecipeHandler;
 import dev.emi.emi.api.recipe.handler.StandardRecipeHandler;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.stack.EmiStackInteraction;
 import dev.emi.emi.bom.BoM;
+import dev.emi.emi.bom.MaterialNode;
 import dev.emi.emi.input.EmiBind;
 import dev.emi.emi.input.EmiInput;
 import dev.emi.emi.registry.EmiRecipeFiller;
@@ -24,6 +27,7 @@ import net.liukrast.schematicdisplay.network.ExtractItemPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
@@ -37,10 +41,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 
 import static net.liukrast.schematicdisplay.EMICreateSchematics.MOD_ID;
@@ -48,6 +49,14 @@ import static net.liukrast.schematicdisplay.SchematicPlugin.CLIPBOARD;
 
 @Mixin(EmiScreenManager.class)
 public class EmiScreenManagerMixin {
+    @Unique
+    private static EmiCraftingRecipe DUMMY_CRAFTING_RECIPE = new EmiCraftingRecipe(Collections.EMPTY_LIST,EmiStack.EMPTY, ResourceLocation.fromNamespaceAndPath(MOD_ID, "dummy_crafting")){
+        @Override
+        public boolean supportsRecipeTree() {
+            return true;
+        }
+    };
+
     @Unique
     private static final EmiBind grabStackToInventory = new EmiBind("key.emi.cheat_stack_to_inventory",
             new EmiBind.ModifiedKey(InputConstants.Type.MOUSE.getOrCreate(0), EmiInput.SHIFT_MASK));
@@ -171,38 +180,57 @@ public class EmiScreenManagerMixin {
 
     @Inject(method = "updateCraftables", at = @At(value = "INVOKE", target = "Ldev/emi/emi/screen/EmiScreenManager;getSearchPanel()Ldev/emi/emi/screen/EmiScreenManager$SidebarPanel;"))
     private static void updateCraftables(CallbackInfo ci, @Local EmiPlayerInventory inv) {
-        if (BoM.tree != null && BoM.craftingMode) {
-            AbstractContainerScreen<?> screen = EmiApi.getHandledScreen();
-            if (screen != null) {
-                List<EmiRecipeHandler<?>> handlers = (List) EmiRecipeFiller.getAllHandlers(screen);
-                if (!handlers.isEmpty()) {
-                    if (handlers.get(0) instanceof StandardRecipeHandler standard) {
-                        List<Slot> slots = standard.getInputSources(screen.getMenu());
-                        for (EmiFavorite.Synthetic syntheticFavorite : EmiFavorites.syntheticFavorites) {
-                            for (Slot slot : slots) {
-                                if (slot.container == Minecraft.getInstance().player.getInventory()) {
-                                    continue;
-                                }
-                                EmiStack synth = syntheticFavorite.getStack().getEmiStacks().get(0);
-                                EmiStack onSlot = EmiStack.of(slot.getItem());
+        if (BoM.tree == null || !BoM.craftingMode) return;
 
-                                if (synth.isEqual(onSlot)) {
-                                    inv.inventory.compute(synth, (k, v) -> {
-                                                v.setAmount(v.getAmount() - onSlot.getAmount());
-                                                if (v.getAmount() <= 0) {
-                                                    v = null;
-                                                }
-                                                return v;
-                                            }
-                                    );
-                                }
-                            }
+        AbstractContainerScreen<?> screen = EmiApi.getHandledScreen();
+        if (screen == null) return;
+
+        List<? extends EmiRecipeHandler<?>> handlers = EmiRecipeFiller.getAllHandlers(screen);
+        if (handlers.isEmpty() || !(handlers.get(0) instanceof StandardRecipeHandler standard)) return;
+
+        List<Slot> slots = standard.getInputSources(screen.getMenu());
+        Map<EmiStack, Long> gridItems = new HashMap<>();
+        Inventory playerInv = Minecraft.getInstance().player.getInventory();
+
+        for (Slot slot : slots) {
+            if (slot.container == playerInv || !slot.hasItem()) continue;
+
+            EmiStack onSlot = EmiStack.of(slot.getItem());
+            gridItems.merge(onSlot, onSlot.getAmount(), Long::sum);
+        }
+        if (gridItems.isEmpty()) return;
+
+        deductTreeIngredients(BoM.tree.goal, standard, gridItems, inv);
+    }
+
+    /**
+     * Recursive helper to walk the tree and deduct supported ingredients.
+     */
+    private static void deductTreeIngredients(MaterialNode node, StandardRecipeHandler<?> handler, Map<EmiStack, Long> gridItems, EmiPlayerInventory inv) {
+        if (node == null) return;
+        EmiRecipe nr = node.recipe;
+        if (nr instanceof EmiResolutionRecipe) {
+            nr = DUMMY_CRAFTING_RECIPE;
+        }
+        if (node.recipe != null && !handler.supportsRecipe(nr)) {
+            if (node.children != null) {
+                for (MaterialNode child : node.children) {
+                    for (EmiStack stack : child.ingredient.getEmiStacks()) {
+                        if (gridItems.containsKey(stack)) {
+                            long gridAmount = gridItems.get(stack);
+                            inv.inventory.computeIfPresent(stack, (k, v) -> {
+                                v.setAmount(v.getAmount() - gridAmount);
+                                return v.getAmount() <= 0 ? null : v;
+                            });
                         }
                     }
                 }
             }
         }
+        if (node.children != null) {
+            for (MaterialNode child : node.children) {
+                deductTreeIngredients(child, handler, gridItems, inv);
+            }
+        }
     }
-//            ignoredSlots.addAll(standard.getInputSources(hs.getMenu()));
-
 }

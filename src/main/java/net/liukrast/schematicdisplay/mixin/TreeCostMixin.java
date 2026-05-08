@@ -16,7 +16,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(TreeCost.class)
 public abstract class TreeCostMixin {
-
     @Inject(method = "calculateCost", at = @At(value = "TAIL"))
     private void completeParent(MaterialNode node, long amount, ChanceState chance, boolean trackProgress, CallbackInfo ci) {
         if (node instanceof ClipboardScreenUtils.DummyMaterialNode) {
@@ -27,7 +26,6 @@ public abstract class TreeCostMixin {
             }
         }
     }
-
 
     @WrapOperation(method = "calculateCost", at = @At(value = "INVOKE", target = "Ldev/emi/emi/bom/TreeCost;getRemainder(Ldev/emi/emi/api/stack/EmiStack;JZ)J"))
     private long calculateCost2(TreeCost instance, EmiStack stack, long desired, boolean catalyst, Operation<Long> original, MaterialNode node) {
