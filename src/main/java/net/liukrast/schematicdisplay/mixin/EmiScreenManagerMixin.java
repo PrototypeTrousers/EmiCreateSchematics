@@ -117,11 +117,7 @@ public class EmiScreenManagerMixin {
                 EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
             } else {
                 ClipboardScreenUtils.ClipboardRecipe cr = new ClipboardScreenUtils.ClipboardRecipe(CLIPBOARD, ResourceLocation.fromNamespaceAndPath(MOD_ID, "/schematic/clipboard"), 0, 0);
-
-                ItemStack out = new ItemStack(AllBlocks.CLIPBOARD);
-                ClipboardContent content = out.getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY);
-                out.set(AllDataComponents.CLIPBOARD_CONTENT, content.setType(ClipboardOverrides.ClipboardType.EDITING));
-                cr.getOutputs().add(EmiStack.of(out));
+                cr.getOutputs().add(EmiStack.EMPTY);
                 cr.getInputs().add(stack.getStack().copy().setAmount(1));
                 if (BoM.tree != null) {
                     cr.getInputs().add(BoM.tree.goal.ingredient.copy().setAmount(BoM.tree.goal.totalNeeded));
@@ -155,8 +151,8 @@ public class EmiScreenManagerMixin {
                 } else {
                     BoM.craftingMode = true;
                     glt.recalculate();
-                    EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
                 }
+                EmiFavorites.updateSynthetic(EmiPlayerInventory.of(Minecraft.getInstance().player));
             }
         }
     }

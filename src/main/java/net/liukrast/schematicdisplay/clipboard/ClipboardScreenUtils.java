@@ -1,11 +1,6 @@
 package net.liukrast.schematicdisplay.clipboard;
 
-import com.simibubi.create.AllBlocks;
-import com.simibubi.create.AllDataComponents;
-import com.simibubi.create.content.equipment.clipboard.ClipboardBlock;
-import com.simibubi.create.content.equipment.clipboard.ClipboardContent;
 import com.simibubi.create.content.equipment.clipboard.ClipboardEntry;
-import com.simibubi.create.content.equipment.clipboard.ClipboardOverrides;
 import dev.emi.emi.api.recipe.BasicEmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeCategory;
@@ -23,15 +18,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-import static net.liukrast.schematicdisplay.EMICreateSchematics.*;
+import static net.liukrast.schematicdisplay.EMICreateSchematics.MOD_ID;
 import static net.liukrast.schematicdisplay.SchematicPlugin.CLIPBOARD;
 
 public final class ClipboardScreenUtils {
     public static void load(List<List<ClipboardEntry>> pages) {
         Minecraft.getInstance().setScreen(null);
-
-        ClipboardRecipe cr = new ClipboardRecipe(CLIPBOARD, ResourceLocation.fromNamespaceAndPath(MOD_ID, "/schematic/clipboard"), 0, 0);
-
+        ClipboardRecipe cr = new ClipboardRecipe(CLIPBOARD, ResourceLocation.fromNamespaceAndPath(MOD_ID, "/schematic/synthetic"), 0, 0);
         for (var page : pages) {
             for (var entry : page) {
                 if (entry.icon.isEmpty()) {
@@ -42,13 +35,9 @@ public final class ClipboardScreenUtils {
                 cr.getInputs().add(EmiStack.of(stack1));
             }
         }
-        ItemStack out = new ItemStack(AllBlocks.CLIPBOARD);
-        ClipboardContent content = out.getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY);
-        out.set(AllDataComponents.CLIPBOARD_CONTENT, content.setType(ClipboardOverrides.ClipboardType.EDITING));
-        cr.getOutputs().add(EmiStack.of(out));
+        cr.getOutputs().add(EmiStack.EMPTY);
         setGoal(cr);
     }
-
 
     private static void setGoal(EmiRecipe recipe) {
         BoM.craftingMode = true;
@@ -72,7 +61,6 @@ public final class ClipboardScreenUtils {
     }
 
     public static class ClipboardRecipe extends BasicEmiRecipe {
-
         public ClipboardRecipe(EmiRecipeCategory category, ResourceLocation id, int width, int height) {
             super(category, id, width, height);
         }

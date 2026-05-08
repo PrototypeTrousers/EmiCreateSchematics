@@ -1,9 +1,6 @@
 package net.liukrast.schematicdisplay.mixin;
 
-import com.simibubi.create.AllItems;
 import com.simibubi.create.content.schematics.SchematicItem;
-import com.simibubi.create.content.schematics.cannon.SchematicannonMenu;
-import com.simibubi.create.content.trains.schedule.ScheduleItem;
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
