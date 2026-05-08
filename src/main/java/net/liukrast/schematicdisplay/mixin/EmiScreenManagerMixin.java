@@ -6,25 +6,20 @@ import com.simibubi.create.AllDataComponents;
 import com.simibubi.create.content.equipment.clipboard.ClipboardContent;
 import com.simibubi.create.content.equipment.clipboard.ClipboardOverrides;
 import dev.emi.emi.api.recipe.EmiPlayerInventory;
-import dev.emi.emi.api.recipe.EmiRecipe;
-import dev.emi.emi.api.recipe.EmiRecipeManager;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.stack.EmiStackInteraction;
 import dev.emi.emi.bom.BoM;
 import dev.emi.emi.input.EmiBind;
 import dev.emi.emi.input.EmiInput;
-import dev.emi.emi.registry.EmiRecipes;
 import dev.emi.emi.runtime.EmiFavorite;
 import dev.emi.emi.runtime.EmiFavorites;
 import dev.emi.emi.screen.EmiScreenManager;
-import it.unimi.dsi.fastutil.chars.AbstractChar2ObjectMap;
 import net.liukrast.schematicdisplay.clipboard.ClipboardScreenUtils;
 import net.liukrast.schematicdisplay.network.ExtractItemPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -128,6 +123,9 @@ public class EmiScreenManagerMixin {
                 out.set(AllDataComponents.CLIPBOARD_CONTENT, content.setType(ClipboardOverrides.ClipboardType.EDITING));
                 cr.getOutputs().add(EmiStack.of(out));
                 cr.getInputs().add(stack.getStack().copy().setAmount(1));
+                if (BoM.tree != null) {
+                    cr.getInputs().add(BoM.tree.goal.ingredient.copy().setAmount(BoM.tree.goal.totalNeeded));
+                }
 
                 BoM.tree = new ClipboardScreenUtils.GoallessMaterialTree(cr);
                 BoM.craftingMode = true;
