@@ -183,45 +183,52 @@ public class EmiScreenManagerMixin {
         if (BoM.tree == null || !BoM.craftingMode) return;
 
         AbstractContainerScreen<?> screen = EmiApi.getHandledScreen();
+
         if (screen == null) return;
-
-        List<? extends EmiRecipeHandler<?>> handlers = EmiRecipeFiller.getAllHandlers(screen);
-        if (handlers.isEmpty() || !(handlers.get(0) instanceof StandardRecipeHandler standard)) return;
-
-        List<Slot> slots = standard.getInputSources(screen.getMenu());
-        Map<EmiStack, Long> gridItems = new HashMap<>();
+        Map<EmiStack, EmiStack> gridItems = new HashMap<>();
         Inventory playerInv = Minecraft.getInstance().player.getInventory();
 
-        for (Slot slot : slots) {
+        for (Slot slot : screen.getMenu().slots) {
             if (slot.container == playerInv || !slot.hasItem()) continue;
 
             EmiStack onSlot = EmiStack.of(slot.getItem());
-            gridItems.merge(onSlot, onSlot.getAmount(), Long::sum);
+            gridItems.merge(onSlot, onSlot, (a, b) -> a.setAmount(a.getAmount() + b.getAmount()));
         }
-        if (gridItems.isEmpty()) return;
 
-        deductTreeIngredients(BoM.tree.goal, standard, gridItems, inv);
+        if (gridItems.isEmpty()) return;
+        List<? extends EmiRecipeHandler<?>> handlers = EmiRecipeFiller.getAllHandlers(screen);
+        if (handlers.isEmpty() || !(handlers.get(0) instanceof StandardRecipeHandler standard)) return;
+
+        deductTreeIngredients(BoM.tree.goal, standard, gridItems, inv, screen);
     }
 
     /**
      * Recursive helper to walk the tree and deduct supported ingredients.
      */
-    private static void deductTreeIngredients(MaterialNode node, StandardRecipeHandler<?> handler, Map<EmiStack, Long> gridItems, EmiPlayerInventory inv) {
+    private static void deductTreeIngredients(MaterialNode node, StandardRecipeHandler handler, Map<EmiStack, EmiStack> gridItems, EmiPlayerInventory inv, AbstractContainerScreen<?> screen) {
         if (node == null) return;
         EmiRecipe nr = node.recipe;
         if (nr instanceof EmiResolutionRecipe) {
             nr = DUMMY_CRAFTING_RECIPE;
         }
-        if (node.recipe != null && !handler.supportsRecipe(nr)) {
+
+        if (node.recipe != null && !handler.getCraftingSlots(screen.getMenu()).isEmpty() && handler.supportsRecipe(nr) ) {
             if (node.children != null) {
                 for (MaterialNode child : node.children) {
                     for (EmiStack stack : child.ingredient.getEmiStacks()) {
                         if (gridItems.containsKey(stack)) {
-                            long gridAmount = gridItems.get(stack);
-                            inv.inventory.computeIfPresent(stack, (k, v) -> {
-                                v.setAmount(v.getAmount() - gridAmount);
-                                return v.getAmount() <= 0 ? null : v;
-                            });
+                            EmiStack gridStack = gridItems.get(stack);
+                            long available = gridStack.getAmount();
+                            long needed = child.amount;
+                            if (available > needed) {
+                                inv.inventory.merge(stack, gridItems.get(stack), (a, b) ->
+                                        a.setAmount(a.getAmount() + needed));
+                                gridStack.setAmount(gridStack.getAmount() - needed);
+                            } else {
+                                inv.inventory.merge(stack, gridItems.get(stack), (a, b) ->
+                                        a.setAmount(a.getAmount() + available));
+                                gridItems.remove(gridStack);
+                            }
                         }
                     }
                 }
@@ -229,7 +236,7 @@ public class EmiScreenManagerMixin {
         }
         if (node.children != null) {
             for (MaterialNode child : node.children) {
-                deductTreeIngredients(child, handler, gridItems, inv);
+                deductTreeIngredients(child, handler, gridItems, inv, screen);
             }
         }
     }
