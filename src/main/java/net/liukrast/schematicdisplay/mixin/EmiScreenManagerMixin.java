@@ -76,11 +76,10 @@ public class EmiScreenManagerMixin {
             actualIngredient = emiFavorite.getStack();
         }
 
-
         if (function.apply(grabStackToInventory)) {
             Player player = Minecraft.getInstance().player;
             long amount;
-            if (actualIngredient instanceof EmiFavorite.Synthetic synthetic) {
+            if (stack.getStack() instanceof EmiFavorite.Synthetic synthetic) {
                 amount = synthetic.amount;
             } else {
                 amount = actualIngredient.getAmount();
@@ -212,6 +211,7 @@ public class EmiScreenManagerMixin {
      * Recursive helper to walk the tree and deduct supported ingredients.
      */
     private static void deductTreeIngredients(MaterialNode node, StandardRecipeHandler handler, Map<EmiStack, EmiStack> gridItems, EmiPlayerInventory inv, AbstractContainerScreen<?> screen) {
+        if (gridItems.isEmpty()) return;
         if (node == null) return;
         EmiRecipe nr = node.recipe;
         if (nr instanceof EmiResolutionRecipe) {
@@ -224,17 +224,9 @@ public class EmiScreenManagerMixin {
                     for (EmiStack stack : child.ingredient.getEmiStacks()) {
                         if (gridItems.containsKey(stack)) {
                             EmiStack gridStack = gridItems.get(stack);
-                            long available = gridStack.getAmount();
-                            long needed = child.amount;
-                            if (available > needed) {
-                                inv.inventory.merge(stack, gridItems.get(stack), (a, b) ->
-                                        a.setAmount(a.getAmount() + needed));
-                                gridStack.setAmount(gridStack.getAmount() - needed);
-                            } else {
-                                inv.inventory.merge(stack, gridItems.get(stack), (a, b) ->
-                                        a.setAmount(a.getAmount() + available));
-                                gridItems.remove(gridStack);
-                            }
+                            inv.inventory.merge(stack, gridItems.get(stack), (a, b) ->
+                                    a.setAmount(a.getAmount() + b.getAmount()));
+                            gridItems.remove(gridStack);
                         }
                     }
                 }
