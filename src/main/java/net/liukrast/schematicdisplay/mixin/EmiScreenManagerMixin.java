@@ -71,13 +71,19 @@ public class EmiScreenManagerMixin {
 
     @Inject(method = "stackInteraction", at = @At(value = "FIELD", target = "Ldev/emi/emi/config/EmiConfig;cheatMode:Z", opcode = Opcodes.GETSTATIC))
     private static void a(EmiStackInteraction stack, Function<EmiBind, Boolean> function, CallbackInfoReturnable<Boolean> cir) {
+        EmiIngredient actualIngredient = stack.getStack();
+        if (actualIngredient instanceof EmiFavorite emiFavorite) {
+            actualIngredient = emiFavorite.getStack();
+        }
+
+
         if (function.apply(grabStackToInventory)) {
             Player player = Minecraft.getInstance().player;
             long amount;
-            if (stack.getStack() instanceof EmiFavorite.Synthetic synthetic) {
+            if (actualIngredient instanceof EmiFavorite.Synthetic synthetic) {
                 amount = synthetic.amount;
             } else {
-                amount = stack.getStack().getAmount();
+                amount = actualIngredient.getAmount();
             }
 
             List<Integer> slots = new ArrayList<>();
@@ -93,7 +99,7 @@ public class EmiScreenManagerMixin {
                     return;
                 }
                 long remaining = amount;
-                for (EmiStack es : stack.getStack().getEmiStacks()) {
+                for (EmiStack es : actualIngredient.getEmiStacks()) {
                     if (es.isEqual(EmiStack.of(slot.getItem()))) {
                         slots.add(slot.getSlotIndex());
                         remaining -= slot.getItem().getCount();
@@ -118,7 +124,7 @@ public class EmiScreenManagerMixin {
                 out:
                 for (EmiIngredient ingredient : inputs) {
                     for (EmiStack es : ingredient.getEmiStacks()) {
-                        if (es.isEqual(stack.getStack().getEmiStacks().get(0))) {
+                        if (es.isEqual(actualIngredient.getEmiStacks().get(0))) {
                             ingredient.setAmount(ingredient.getAmount() + 1);
                             existing = true;
                             break out;
@@ -126,7 +132,7 @@ public class EmiScreenManagerMixin {
                     }
                 }
                 if (!existing) {
-                    inputs.add(stack.getStack().copy().setAmount(1));
+                    inputs.add(actualIngredient.copy().setAmount(1));
                 }
                 BoM.craftingMode = true;
                 glt.recalculate();
@@ -134,7 +140,7 @@ public class EmiScreenManagerMixin {
             } else {
                 ClipboardScreenUtils.ClipboardRecipe cr = new ClipboardScreenUtils.ClipboardRecipe(CLIPBOARD, ResourceLocation.fromNamespaceAndPath(MOD_ID, "/schematic/clipboard"), 0, 0);
                 cr.getOutputs().add(EmiStack.EMPTY);
-                cr.getInputs().add(stack.getStack().copy().setAmount(1));
+                cr.getInputs().add(actualIngredient.copy().setAmount(1));
                 if (BoM.tree != null) {
                     cr.getInputs().add(BoM.tree.goal.ingredient.copy().setAmount(BoM.tree.goal.totalNeeded));
                 }
@@ -151,7 +157,7 @@ public class EmiScreenManagerMixin {
                 for (Iterator<EmiIngredient> iterator = inputs.iterator(); iterator.hasNext(); ) {
                     EmiIngredient ingredient = iterator.next();
                     for (EmiStack es : ingredient.getEmiStacks()) {
-                        if (es.isEqual(stack.getStack().getEmiStacks().get(0))) {
+                        if (es.isEqual(actualIngredient.getEmiStacks().get(0))) {
                             ingredient.setAmount(ingredient.getAmount() - 1);
                             if (ingredient.getAmount() <= 0) {
                                 iterator.remove();

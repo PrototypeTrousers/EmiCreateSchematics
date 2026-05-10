@@ -24,16 +24,12 @@ public class EmiPlayerInventoryMixin {
      */
     @Overwrite
     public static EmiPlayerInventory of(Player entity) {
-        AbstractContainerScreen<?> screen = EmiApi.getHandledScreen();
-        if (screen != null) {
-            List<EmiRecipeHandler<?>> handlers = (List) EmiRecipeFiller.getAllHandlers(screen);
-            if (!handlers.isEmpty()) {
-                return new EmiPlayerInventory(
-                        entity.getInventory().items.stream()
-                                .filter(i -> !i.isEmpty())
-                                .map(EmiStack::of)
-                                .toList());
-            }
+        if (entity != null) {
+            return new EmiPlayerInventory(
+                    entity.getInventory().items.stream()
+                            .filter(i -> !i.isEmpty())
+                            .map(EmiStack::of)
+                            .toList());
         }
         return new EmiPlayerInventory(List.of());
     }
