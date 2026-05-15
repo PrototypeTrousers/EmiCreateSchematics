@@ -14,6 +14,8 @@
     "EmiFavoritesMixin",
     "EmiPlayerInventoryMixin",
     "EmiScreenManagerMixin",
+    "JemiRecipeHandlerMixin",
+    "StockKeeperTransferHandlerMixin",
     "TreeCostMixin"
   ]
 }
