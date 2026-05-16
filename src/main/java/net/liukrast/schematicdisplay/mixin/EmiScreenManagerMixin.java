@@ -69,7 +69,7 @@ public class EmiScreenManagerMixin {
     private static final EmiBind removeStackFromCraftingTree = new EmiBind("key.emi.cheat_stack_to_inventory",
             new EmiBind.ModifiedKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_KP_SUBTRACT), 0));
 
-    @Inject(method = "stackInteraction", at = @At(value = "FIELD", target = "Ldev/emi/emi/config/EmiConfig;cheatMode:Z", opcode = Opcodes.GETSTATIC))
+    @Inject(method = "stackInteraction", at = @At(value = "INVOKE", target = "Ldev/emi/emi/api/EmiApi;isCheatMode()Z"))
     private static void a(EmiStackInteraction stack, Function<EmiBind, Boolean> function, CallbackInfoReturnable<Boolean> cir) {
         EmiIngredient actualIngredient = stack.getStack();
         if (actualIngredient instanceof EmiFavorite emiFavorite) {
