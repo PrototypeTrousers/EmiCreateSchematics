@@ -4,21 +4,20 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.simibubi.create.compat.jei.StockKeeperTransferHandler;
-import com.simibubi.create.content.logistics.stockTicker.CraftableBigItemStack;
-import com.simibubi.create.content.logistics.stockTicker.StockKeeperRequestScreen;
+import com.simibubi.create.content.logistics.stockTicker.StockKeeperRequestMenu;
 import com.simibubi.create.foundation.blockEntity.ItemHandlerContainer;
+import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
+import mezz.jei.api.recipe.RecipeIngredientRole;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import net.neoforged.neoforge.items.ItemStackHandler;
-import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 @Mixin(StockKeeperTransferHandler.class)
@@ -43,7 +42,8 @@ public class StockKeeperTransferHandlerMixin {
     }
 
     @WrapOperation(method = "transferRecipeOnClient", at = @At(value = "NEW", target = "(Lnet/neoforged/neoforge/items/IItemHandlerModifiable;)Lcom/simibubi/create/foundation/blockEntity/ItemHandlerContainer;", ordinal = 0))
-    ItemHandlerContainer b(IItemHandlerModifiable inv, Operation<ItemHandlerContainer> original, @Local(name = "recipe") Recipe<?> recipe) {
-        return new ItemHandlerContainer(new ItemStackHandler(Math.max(recipe.getIngredients().size(), 9)));
+    ItemHandlerContainer b(IItemHandlerModifiable inv, Operation<ItemHandlerContainer> original, StockKeeperRequestMenu container, RecipeHolder<Recipe<?>> recipeHolder,
+                           IRecipeSlotsView recipeSlots) {
+        return new ItemHandlerContainer(new ItemStackHandler(recipeSlots.getSlotViews(RecipeIngredientRole.INPUT).size()));
     }
 }
